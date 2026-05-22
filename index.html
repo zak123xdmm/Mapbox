@@ -2,76 +2,81 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Mapbox</title>
+  <title>Mapbox con Geocerca Actualizada</title>
 
-  <!-- MAPBOX CSS -->
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
 
   <style>
     body { 
-  margin: 0; 
-  padding: 0; 
-  font-family: 'Segoe UI', sans-serif;
-  overflow: hidden;
-}
+      margin: 0; 
+      padding: 0; 
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
 
-#map { 
-  width: 100%; 
-  height: 100vh; 
-}
+    #map { 
+      width: 100%; 
+      height: 100vh; 
+    }
 
-/* Panel moderno tipo glass */
-#info {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(20, 20, 20, 0.65);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
-  color: white;
-  padding: 18px 25px;
-  border-radius: 18px;
-  z-index: 1;
-  min-width: 280px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-  border: 1px solid rgba(255,255,255,0.1);
-  transition: all 0.3s ease;
-}
+    #info {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 20, 20, 0.65);
+      backdrop-filter: blur(15px);
+      -webkit-backdrop-filter: blur(15px);
+      color: white;
+      padding: 18px 25px;
+      border-radius: 18px;
+      z-index: 1;
+      min-width: 280px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: all 0.3s ease;
+    }
 
-/* Título */
-#info h3 {
-  margin: 0 0 12px 0;
-  font-weight: 600;
-  font-size: 18px;
-  text-align: center;
-  letter-spacing: 1px;
-  color: #00E0FF;
-}
+    #info h3 {
+      margin: 0 0 12px 0;
+      font-weight: 600;
+      font-size: 18px;
+      text-align: center;
+      letter-spacing: 1px;
+      color: #00E0FF;
+      transition: color 0.3s ease;
+    }
 
-/* Filas de datos */
-.info-item {
-  display: flex;
-  justify-content: space-between;
-  margin: 6px 0;
-  font-size: 14px;
-}
+    #info.fuera-geocerca {
+      background: rgba(139, 0, 0, 0.8);
+      border: 1px solid rgba(255, 0, 0, 0.4);
+    }
+    #info.fuera-geocerca h3 {
+      color: #FF4D4D;
+    }
 
-.label {
-  opacity: 0.7;
-}
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      margin: 6px 0;
+      font-size: 14px;
+    }
 
-.value {
-  font-weight: bold;
-  color: #ffffff;
-}
+    .label {
+      opacity: 0.7;
+    }
+
+    .value {
+      font-weight: bold;
+      color: #ffffff;
+    }
   </style>
 </head>
 <body>
 
 <div id="map"></div>
 <div id="info">
-  <h3>Ubicación en Tiempo Real</h3>
+  <h3 id="estado-titulo">Ubicación en Tiempo Real</h3>
 
   <div class="info-item">
     <span class="label">Latitud:</span>
@@ -84,21 +89,24 @@
   </div>
 
   <div class="info-item">
+    <span class="label">Estado:</span>
+    <span class="value" id="geocerca-status">Calculando...</span>
+  </div>
+
+  <div class="info-item">
     <span class="label">Última actualización:</span>
     <span class="value" id="hora">--</span>
   </div>
 </div>
 
-<!-- MAPBOX JS -->
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
 <script type="module">
 
-// IMPORTAR FIREBASE
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
 import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js";
 
-// CONFIGURACIÓN FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyCV9fZDl26hfyPDSZd6Mxw7bBATHVYGB6Y",
   authDomain: "programacionmovilmapbox.firebaseapp.com",
@@ -109,37 +117,70 @@ const firebaseConfig = {
   appId: "1:951654593098:web:29b3b379e635e02e746cb3"
 };
 
-//INICIALIZAR FIREBASE
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
-//TOKEN MAPBOX
 mapboxgl.accessToken = "pk.eyJ1IjoiY3Jpc3RoaWFubGFpbWUiLCJhIjoiY21tOGR2eW53MHU5aDJwb2wxNXBqOXRvYyJ9.qoMU6ebmLDQUnkDI6AsAtQ";
 
-//CREAR MAPA
+const centroGeocerca = [-68.120051, -16.503418]; 
+const radioGeocercaMetros = 100; 
+
 const map = new mapboxgl.Map({
   container: 'map',
   style: 'mapbox://styles/mapbox/streets-v12',
-  center: [-68.15, -16.5],
+  center: centroGeocerca,
   zoom: 15
 });
 
-// Crear elemento HTML personalizado
 const el = document.createElement('div');
 el.innerHTML = "🧍";
 el.style.fontSize = "40px";
 el.style.transform = "translate(-50%, -50%)";
 
-// Crear marcador con ese elemento
 const marker = new mapboxgl.Marker(el)
-  .setLngLat([-68.15, -16.5])
+  .setLngLat(centroGeocerca)
   .addTo(map);
-// ELEMENTOS DEL INFO
+
+const infoPanel = document.getElementById('info');
+const tituloPanel = document.getElementById('estado-titulo');
 const latDiv = document.getElementById('latitud');
 const lngDiv = document.getElementById('longitud');
+const geoDiv = document.getElementById('geocerca-status');
 const horaDiv = document.getElementById('hora');
 
-// ESCUCHAR FIREBASE
+map.on('load', () => {
+  const centroPunto = turf.point(centroGeocerca);
+  const circuloGeocerca = turf.circle(centroPunto, radioGeocercaMetros, { units: 'meters' });
+
+  map.addSource('geocerca-source', {
+    'type': 'geojson',
+    'data': circuloGeocerca
+  });
+
+  map.addLayer({
+    'id': 'geocerca-fill',
+    'type': 'fill',
+    'source': 'geocerca-source',
+    'layout': {},
+    'paint': {
+      'fill-color': '#00E0FF',
+      'fill-opacity': 0.15
+    }
+  });
+
+  map.addLayer({
+    'id': 'geocerca-outline',
+    'type': 'line',
+    'source': 'geocerca-source',
+    'layout': {},
+    'paint': {
+      'line-color': '#00E0FF',
+      'line-width': 2,
+      'line-dasharray': [2, 2]
+    }
+  });
+});
+
 const locationRef = ref(database, "ubicacion");
 
 onValue(locationRef, (snapshot) => {
@@ -148,24 +189,38 @@ onValue(locationRef, (snapshot) => {
   if (data && data.latitud && data.longitud && data.timestamp) {
     const nuevaPosicion = [data.longitud, data.latitud];
 
-    // Actualizar marcador
     marker.setLngLat(nuevaPosicion);
     map.flyTo({
       center: nuevaPosicion,
       speed: 1.5
     });
 
-    // Mostrar latitud y longitud
-    latDiv.textContent = `Latitud: ${data.latitud.toFixed(6)}`;
-    lngDiv.textContent = `Longitud: ${data.longitud.toFixed(6)}`;
+    latDiv.textContent = data.latitud.toFixed(6);
+    lngDiv.textContent = data.longitud.toFixed(6);
 
-    // Convertir timestamp a hora legible
+    const puntoUsuario = turf.point(nuevaPosicion);
+    const centroPunto = turf.point(centroGeocerca);
+    
+    const distanciaMetros = turf.distance(puntoUsuario, centroPunto, { units: 'meters' });
+
+    if (distanciaMetros <= radioGeocercaMetros) {
+      geoDiv.textContent = "Dentro del límite";
+      geoDiv.style.color = "#00FF66";
+      tituloPanel.textContent = "Ubicación en Tiempo Real";
+      infoPanel.classList.remove('fuera-geocerca');
+    } else {
+      geoDiv.textContent = `FUERA DE LÍMITE (+${Math.round(distanciaMetros - radioGeocercaMetros)}m)`;
+      geoDiv.style.color = "#FF4D4D";
+      tituloPanel.textContent = "🚨 ¡ALERTA DE GEOCERCA!";
+      infoPanel.classList.add('fuera-geocerca');
+    }
+
     const date = new Date(data.timestamp);
     const opciones = { 
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', second: '2-digit'
     };
-    horaDiv.textContent = `Hora: ${date.toLocaleString('es-BO', opciones)}`;
+    horaDiv.textContent = date.toLocaleString('es-BO', opciones);
   }
 });
 
